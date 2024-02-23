@@ -281,7 +281,7 @@ int main(int argc, char *argv[]) {
 							cv::Point(40, 40),
 							cv::FONT_HERSHEY_SIMPLEX,1,
 							cv::Scalar(0,255,0),2);
-			memcpy(data, frame.data, 720 * 480 * 3);					
+			memcpy(data, frame.data, width * height * 3);					
 		}
 
 
