@@ -20,6 +20,12 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+RK_U64 TEST_COMM_GetNowUs() {
+	struct timespec time = {0, 0};
+	clock_gettime(CLOCK_MONOTONIC, &time);
+	return (RK_U64)time.tv_sec * 1000000 + (RK_U64)time.tv_nsec / 1000; /* microseconds */
+}
+
 static RK_S32 test_venc_init(int chnId, int width, int height, RK_CODEC_ID_E enType) {
 	printf("%s\n",__func__);
 	VENC_RECV_PIC_PARAM_S stRecvParam;
@@ -173,9 +179,12 @@ int main(int argc, char *argv[]) {
 	RK_S32 s32Ret = 0; 
 
 	int sX,sY,eX,eY;
-    
-	int width    = 720;
-    int height   = 480;
+	int width    = 2304;
+    int height   = 1296;
+
+	char fps_text[16];
+	float fps = 0;
+	memset(fps_text,0,16);
 
 	//h264_frame	
 	VENC_STREAM_S stFrame;	
@@ -234,6 +243,7 @@ int main(int argc, char *argv[]) {
 	
 	while(1)
 	{	
+		
 
 		// get vpss frame
 		s32Ret = RK_MPI_VPSS_GetChnFrame(0,0, &stVpssFrame,-1);
@@ -263,15 +273,17 @@ int main(int argc, char *argv[]) {
 					stVpssFrame.stVFrame.u32FrameFlag	
 					);
 			*/	
-			//opencv	
-			cv::Mat frame(height,width,CV_8UC3, data);			
-            cv::putText(frame,"opencv test",
-								cv::Point(40, 40),
-                                cv::FONT_HERSHEY_SIMPLEX,1,
-                                cv::Scalar(0,255,0),2);
+			//opencv
 
+			cv::Mat frame(height,width,CV_8UC3, data);	
+			sprintf(fps_text,"fps = %.2f",fps);		
+            cv::putText(frame,fps_text,
+							cv::Point(40, 40),
+							cv::FONT_HERSHEY_SIMPLEX,1,
+							cv::Scalar(0,255,0),2);
 			memcpy(data, frame.data, 720 * 480 * 3);					
 		}
+
 
 		// send stream
 		// encode H264	
@@ -282,13 +294,14 @@ int main(int argc, char *argv[]) {
 		{
 			if(g_rtsplive && g_rtsp_session)
 			{
-				//printf("len = %d PTS = %d \n",stFrame.pstPack->u32Len, stFrame.pstPack->u64PTS);
-				
+				//printf("len = %d PTS = %d \n",stFrame.pstPack->u32Len, stFrame.pstPack->u64PTS);	
 				void *pData = RK_MPI_MB_Handle2VirAddr(stFrame.pstPack->pMbBlk);
 				rtsp_tx_video(g_rtsp_session, (uint8_t *)pData, stFrame.pstPack->u32Len,
 							  stFrame.pstPack->u64PTS);
 				rtsp_do_event(g_rtsplive);
 			}
+			RK_U64 nowUs = TEST_COMM_GetNowUs();
+			fps = (float) 1000000 / (float)(nowUs - stVpssFrame.stVFrame.u64PTS);			
 		}
 
 		// release frame 
